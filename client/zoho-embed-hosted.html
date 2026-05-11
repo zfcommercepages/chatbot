@@ -1,0 +1,41 @@
+<!-- ============================================================
+  Zoho Commerce — Storefront chatbot (hosted CSS/JS on YOUR Python server)
+
+  1. Deploy this repo (FastAPI). Same origin serves:
+       https://YOUR-HOST/widget/widget.css
+       https://YOUR-HOST/widget/widget.js
+       https://YOUR-HOST/api/chat
+  2. Edit WIDGET_ASSET_BASE (no trailing slash) — same as CHAT_BACKEND_URL.
+  3. Paste before </body> in Zoho: Settings → Themes → Edit Code.
+
+  Script runs on the Zoho store page → Zoho Storefront API stays same-origin.
+============================================================ -->
+
+<script>
+(function () {
+  var WIDGET_ASSET_BASE = 'https://your-python-host.example.com';
+
+  window.FF_CHATBOT_CONFIG = {
+    CHAT_BACKEND_URL: WIDGET_ASSET_BASE,
+    WIDGET_SECRET: '',
+    STORE_NAME: 'Your Store Name',
+    STORE_BASE: 'https://your-store.zohoecommerce.com',
+    STORE_DOMAIN: 'your-store.zohoecommerce.com',
+    STORE_VERTICALS:
+      'clothing and fashion, consumer electronics, furniture, and home decor',
+    STORE_POLICIES:
+      'Edit with your real policies: shipping, returns, support email/phone, coupons.'
+  };
+
+  var base = WIDGET_ASSET_BASE.replace(/\/$/, '');
+  var link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = base + '/widget/widget.css';
+  document.head.appendChild(link);
+
+  var s = document.createElement('script');
+  s.src = base + '/widget/widget.js';
+  s.defer = true;
+  document.body.appendChild(s);
+})();
+</script>

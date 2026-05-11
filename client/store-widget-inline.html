@@ -1,0 +1,755 @@
+<!-- ============================================================
+  Zoho Commerce AI Chatbot — multi-category store + catalog lists
+  1. Deploy the Python proxy (python/ + README) — API key lives only on the server
+  2. Set CHAT_BACKEND_URL (+ optional WIDGET_SECRET) and STORE_* in CONFIG below
+  3. Paste before </body> in Zoho: Settings → Themes → Edit Code
+  ZOHO_API defaults to same origin as STORE_BASE (/storefront/api/v1)
+============================================================ -->
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+
+<style>
+#ff-chatbot {
+  --ff-s:  #161616; --ff-s2: #1e1e1e; --ff-s3: #252525;
+  --ff-b:  #2a2a2a; --ff-b2: #343434;
+  --ff-a:  #c8a96e; --ff-a2: #e8c78d; --ff-abg: rgba(200,169,110,.1);
+  --ff-tx: #f0ece4; --ff-mu: #888;    --ff-di: #4a4a4a;
+  --ff-gr: #5cb85c; --ff-re: #e07070;
+  --ff-serif: 'Cormorant Garamond', Georgia, serif;
+  --ff-ui:    'DM Sans', system-ui, sans-serif;
+  position: fixed; bottom: 24px; right: 24px; z-index: 99999;
+  font-family: var(--ff-ui); font-size: 14px; line-height: 1.4; box-sizing: border-box;
+}
+#ff-chatbot *, #ff-chatbot *::before, #ff-chatbot *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+#ff-fab {
+  width: 56px; height: 56px; background: linear-gradient(135deg,var(--ff-a),#9a7035);
+  border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 24px; box-shadow: 0 4px 20px rgba(0,0,0,.5);
+  transition: transform .2s, box-shadow .2s; position: relative;
+}
+#ff-fab:hover { transform: scale(1.08); }
+#ff-fab-badge {
+  position: absolute; top: -2px; right: -2px; background: #e05555; color: #fff;
+  width: 18px; height: 18px; border-radius: 50%; font-size: 10px; font-weight: 700;
+  display: none; align-items: center; justify-content: center; font-family: var(--ff-ui);
+}
+#ff-fab-badge.on { display: flex; }
+
+#ff-panel {
+  position: absolute; bottom: 68px; right: 0; width: 400px; height: 660px;
+  background: var(--ff-s); border: 1px solid var(--ff-b); border-radius: 20px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.85); display: none; flex-direction: column; overflow: hidden;
+}
+#ff-panel.open { display: flex; }
+
+#ff-panel .ff-hdr {
+  background: linear-gradient(135deg,#18130d,#1e180f,#16120a); border-bottom: 1px solid #2e2010;
+  padding: 13px 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+#ff-panel .ff-logo {
+  width: 34px; height: 34px; background: linear-gradient(135deg,var(--ff-a),#9a7035);
+  border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+#ff-panel .ff-hinfo { flex: 1; }
+#ff-panel .ff-hname { font-family: var(--ff-serif); font-size: 15px; font-weight: 600; color: var(--ff-a2); }
+#ff-panel .ff-hstat {
+  font-size: 10px; color: var(--ff-gr); display: flex; align-items: center; gap: 4px; margin-top: 1px;
+}
+#ff-panel .ff-hstat::before {
+  content:''; width:5px; height:5px; background:var(--ff-gr); border-radius:50%; animation:ffpu 2s infinite;
+}
+@keyframes ffpu{0%,100%{opacity:1}50%{opacity:.4}}
+#ff-panel .ff-hcart {
+  background: var(--ff-abg); border: 1px solid #3a2e18; color: var(--ff-a);
+  padding: 5px 11px; border-radius: 20px; font-family: var(--ff-ui); font-size: 11px;
+  font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 5px;
+}
+#ff-panel .ff-hcart:hover { background: var(--ff-a); color: #1a1200; }
+#ff-panel .ff-hclose {
+  background: transparent; border: none; cursor: pointer; color: var(--ff-mu);
+  font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 6px; transition: color .2s;
+}
+#ff-panel .ff-hclose:hover { color: var(--ff-tx); }
+#ff-cbadge {
+  background: var(--ff-a); color: #1a1200; width: 15px; height: 15px; border-radius: 50%;
+  font-size: 9px; font-weight: 700; display: none; align-items: center; justify-content: center;
+}
+#ff-cbadge.on { display: flex; }
+
+#ff-msgs {
+  flex: 1; overflow-y: auto; padding: 13px 12px 8px;
+  display: flex; flex-direction: column; gap: 9px; scroll-behavior: smooth;
+}
+#ff-msgs::-webkit-scrollbar { width: 3px; }
+#ff-msgs::-webkit-scrollbar-thumb { background: #2e2e2e; border-radius: 4px; }
+#ff-panel .ff-row { display: flex; gap: 7px; align-items: flex-end; }
+#ff-panel .ff-row.bot  { align-self: flex-start; width: 100%; }
+#ff-panel .ff-row.user { align-self: flex-end; max-width: 82%; flex-direction: row-reverse; }
+#ff-panel .ff-av {
+  width: 22px; height: 22px; flex-shrink: 0;
+  background: linear-gradient(135deg,var(--ff-a),#9a7035); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; color: #1a1200; font-weight: 700; margin-bottom: 2px;
+}
+#ff-panel .ff-bbl {
+  padding: 8px 12px; border-radius: 14px; font-size: 13px;
+  line-height: 1.55; color: var(--ff-tx); word-break: break-word;
+}
+#ff-panel .ff-row.bot  .ff-bbl { background: var(--ff-s2); border: 1px solid var(--ff-b); border-bottom-left-radius: 3px; }
+#ff-panel .ff-row.user .ff-bbl { background: var(--ff-a); color: #1a1200; font-weight: 500; border-bottom-right-radius: 3px; }
+#ff-panel .ff-typing { display: flex; gap: 4px; padding: 8px 12px; }
+#ff-panel .ff-typing span {
+  width: 6px; height: 6px; background: var(--ff-a); border-radius: 50%; animation: ffbo 1.2s infinite ease-in-out;
+}
+#ff-panel .ff-typing span:nth-child(2){animation-delay:.2s}
+#ff-panel .ff-typing span:nth-child(3){animation-delay:.4s}
+@keyframes ffbo{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-5px);opacity:1}}
+#ff-panel .ff-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 1px 0; }
+#ff-panel .ff-chip {
+  padding: 4px 11px; background: transparent; border: 1px solid #3a2e18; border-radius: 20px;
+  color: var(--ff-a); font-size: 11.5px; cursor: pointer; font-family: var(--ff-ui); transition: all .15s;
+}
+#ff-panel .ff-chip:hover { background: var(--ff-a); color: #1a1200; border-color: var(--ff-a); }
+
+#ff-panel .ff-tscroll {
+  display: flex; gap: 9px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; width: 100%;
+}
+#ff-panel .ff-tscroll::-webkit-scrollbar { display: none; }
+#ff-panel .ff-tile {
+  flex-shrink: 0; width: 148px; background: var(--ff-s3); border: 1px solid var(--ff-b2);
+  border-radius: 13px; overflow: hidden; cursor: pointer; transition: border-color .2s, transform .15s;
+  display: flex; flex-direction: column;
+}
+#ff-panel .ff-tile:hover { border-color: var(--ff-a); transform: translateY(-2px); }
+#ff-panel .ff-timg { width: 100%; height: 120px; object-fit: cover; display: block; background: #1c1c1c; }
+#ff-panel .ff-tph {
+  width: 100%; height: 120px; background: linear-gradient(135deg,#1c1814,#231f14);
+  display: flex; align-items: center; justify-content: center; font-size: 34px;
+}
+#ff-panel .ff-tbody { padding: 8px 9px 9px; flex: 1; display: flex; flex-direction: column; }
+#ff-panel .ff-tname {
+  font-size: 11.5px; font-weight: 600; color: var(--ff-tx); line-height: 1.35; margin-bottom: 3px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+#ff-panel .ff-tpr { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px; }
+#ff-panel .ff-tprice { font-size: 12.5px; font-weight: 700; color: var(--ff-a); }
+#ff-panel .ff-torig  { font-size: 10px; color: var(--ff-di); text-decoration: line-through; }
+#ff-panel .ff-tbdg   { background: #3a1a1a; color: var(--ff-re); font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; }
+#ff-panel .ff-toos   { font-size: 10px; color: var(--ff-re); margin-top: 2px; }
+#ff-panel .ff-tatc   { margin-top: auto; padding-top: 7px; }
+#ff-panel .ff-tatc button {
+  width: 100%; padding: 5px 4px; background: var(--ff-a); color: #1a1200; border: none;
+  border-radius: 7px; font-family: var(--ff-ui); font-size: 10px; font-weight: 700;
+  letter-spacing: .4px; cursor: pointer; transition: background .15s;
+}
+#ff-panel .ff-tatc button:hover { background: var(--ff-a2); }
+#ff-panel .ff-tatc button:disabled { background: #2a2a2a; color: var(--ff-mu); cursor: not-allowed; }
+
+#ff-panel .ff-pcard { background: var(--ff-s3); border: 1px solid var(--ff-b2); border-radius: 13px; overflow: hidden; }
+#ff-panel .ff-pcard:hover { border-color: var(--ff-a); }
+#ff-panel .ff-pcimg { width: 100%; height: 160px; object-fit: cover; display: block; }
+#ff-panel .ff-pcph {
+  width: 100%; height: 160px; background: linear-gradient(135deg,#1c1814,#231f14);
+  display: flex; align-items: center; justify-content: center; font-size: 48px;
+}
+#ff-panel .ff-pcbody { padding: 10px 12px; }
+#ff-panel .ff-pcname  { font-family: var(--ff-serif); font-size: 16px; font-weight: 600; color: var(--ff-a2); margin-bottom: 2px; }
+#ff-panel .ff-pcprice { font-size: 13px; color: var(--ff-tx); margin-bottom: 5px; }
+#ff-panel .ff-pcdesc  { font-size: 11.5px; color: var(--ff-mu); line-height: 1.5; max-height: 44px; overflow: hidden; margin-bottom: 8px; }
+#ff-panel .ff-vgrp { margin-bottom: 6px; }
+#ff-panel .ff-vlbl { font-size: 10px; color: var(--ff-mu); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; }
+#ff-panel .ff-vrow { display: flex; flex-wrap: wrap; gap: 4px; }
+#ff-panel .ff-vchip {
+  padding: 2px 9px; border: 1px solid var(--ff-b2); border-radius: 20px; font-size: 11px;
+  color: var(--ff-mu); cursor: pointer; background: transparent; font-family: var(--ff-ui); transition: all .15s;
+}
+#ff-panel .ff-vchip:hover, #ff-panel .ff-vchip.sel { border-color: var(--ff-a); color: var(--ff-a); }
+#ff-panel .ff-atcrow { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+#ff-panel .ff-qb {
+  width: 26px; height: 26px; background: var(--ff-b); border: none; color: var(--ff-tx);
+  border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; transition: background .15s;
+}
+#ff-panel .ff-qb:hover { background: var(--ff-a); color: #1a1200; }
+#ff-panel .ff-qn { font-size: 13px; color: var(--ff-tx); min-width: 17px; text-align: center; }
+#ff-panel .ff-atcbtn {
+  flex: 1; padding: 6px 10px; background: var(--ff-a); color: #1a1200; border: none;
+  border-radius: 7px; font-family: var(--ff-ui); font-size: 11px; font-weight: 700;
+  cursor: pointer; letter-spacing: .4px; transition: background .15s;
+}
+#ff-panel .ff-atcbtn:hover { background: var(--ff-a2); }
+#ff-panel .ff-atcbtn:disabled { background: #2a2a2a; color: var(--ff-mu); cursor: not-allowed; }
+#ff-panel .ff-vbtn {
+  padding: 6px 9px; background: transparent; border: 1px solid var(--ff-a); color: var(--ff-a);
+  border-radius: 7px; font-size: 11px; font-weight: 600; cursor: pointer; text-decoration: none; transition: all .15s;
+}
+#ff-panel .ff-vbtn:hover { background: var(--ff-a); color: #1a1200; }
+
+#ff-panel .ff-bar {
+  border-top: 1px solid var(--ff-b); padding: 9px 12px; display: flex; gap: 8px;
+  align-items: flex-end; background: var(--ff-s); flex-shrink: 0;
+}
+#ff-panel .ff-inp {
+  flex: 1; background: var(--ff-s2); border: 1px solid var(--ff-b); border-radius: 10px;
+  padding: 8px 12px; color: var(--ff-tx); font-family: var(--ff-ui); font-size: 13px;
+  resize: none; outline: none; line-height: 1.4; max-height: 80px; transition: border-color .2s;
+}
+#ff-panel .ff-inp:focus { border-color: var(--ff-a); }
+#ff-panel .ff-inp::placeholder { color: var(--ff-di); }
+#ff-panel .ff-send {
+  width: 36px; height: 36px; background: var(--ff-a); border: none; border-radius: 9px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background .15s, transform .1s; flex-shrink: 0;
+}
+#ff-panel .ff-send:hover { background: var(--ff-a2); transform: scale(1.05); }
+#ff-panel .ff-send svg { width: 15px; height: 15px; fill: #1a1200; }
+
+#ff-toast {
+  position: absolute; bottom: 68px; left: 50%; transform: translateX(-50%) translateY(8px);
+  background: #162816; border: 1px solid #2d5a2d; color: #6dbf6d;
+  padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;
+  font-family: var(--ff-ui); opacity: 0; transition: all .3s; pointer-events: none; white-space: nowrap; z-index: 10;
+}
+#ff-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+
+<script>
+(function () {
+
+  // ═══════════════════════════════════════════════════
+  //  CONFIG — edit before deploying
+  // ═══════════════════════════════════════════════════
+  /** HTTPS URL of your deployed chat proxy (see README in this repo) — no trailing slash */
+  var CHAT_BACKEND_URL  = 'https://your-chat-proxy.example.com';
+  /** Optional: same value as WIDGET_SECRET on the server — deters casual abuse of your proxy */
+  var WIDGET_SECRET     = '';
+  var STORE_NAME        = 'Your Store Name';
+  var STORE_BASE        = 'https://your-store.zohoecommerce.com';
+  var STORE_DOMAIN      = 'your-store.zohoecommerce.com';
+  /** Same-origin Storefront API (recommended). Override if needed, e.g. https://commerce.zoho.in/storefront/api/v1 */
+  var ZOHO_API = (function () {
+    try { return new URL(STORE_BASE).origin + '/storefront/api/v1'; }
+    catch (e) { return 'https://commerce.zoho.com/storefront/api/v1'; }
+  })();
+
+  var STORE_VERTICALS =
+    'clothing and fashion, consumer electronics, furniture, and home decor';
+  var STORE_POLICIES =
+    'Edit this line with your real policies: shipping regions, returns window, warranty for electronics, ' +
+    'assembly notes for furniture, care for fabrics, support email and phone, and any active coupon codes.';
+  // ═══════════════════════════════════════════════════
+
+  var root = document.createElement('div');
+  root.id  = 'ff-chatbot';
+  root.innerHTML =
+    '<div id="ff-toast"></div>' +
+    '<div id="ff-panel">' +
+      '<div class="ff-hdr">' +
+        '<div class="ff-logo">&#128249;</div>' +
+        '<div class="ff-hinfo">' +
+          '<div class="ff-hname">' + STORE_NAME + '</div>' +
+          '<div class="ff-hstat">Shopping Assistant</div>' +
+        '</div>' +
+        '<button class="ff-hcart" onclick="ffShowCart()">&#128722; <span id="ff-cbadge"></span></button>' +
+        '<button class="ff-hclose" onclick="ffToggle()">&#10005;</button>' +
+      '</div>' +
+      '<div id="ff-msgs"></div>' +
+      '<div class="ff-bar">' +
+        '<textarea class="ff-inp" id="ff-inp" rows="1" placeholder="Search, browse categories, or ask a question&hellip;"' +
+          ' onkeydown="ffOnKey(event)" oninput="ffResize(this)"></textarea>' +
+        '<button class="ff-send" onclick="ffSend()">' +
+          '<svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>' +
+        '</button>' +
+      '</div>' +
+    '</div>' +
+    '<button id="ff-fab" onclick="ffToggle()" title="Chat with us">' +
+      '&#128249;<span id="ff-fab-badge"></span>' +
+    '</button>';
+  document.body.appendChild(root);
+
+  var cartId       = localStorage.getItem('ff_cart') || null;
+  var Q = {}, V = {}, cache = {}, history = [];
+  var isOpen = false;
+  var LIST_PRODUCTS_CAP = 30;
+
+  window.ffToggle = function () {
+    isOpen = !isOpen;
+    document.getElementById('ff-panel').classList.toggle('open', isOpen);
+  };
+
+  async function zohoFetch(path, opts) {
+    opts = opts || {};
+    var headers = { 'domain-name': STORE_DOMAIN, 'Content-Type': 'application/json' };
+    if (cartId) headers['Cookie'] = 'zcid=' + cartId;
+    var r = await fetch(ZOHO_API + path, {
+      method: opts.method || 'GET', headers: headers,
+      body: opts.body || undefined, credentials: 'include'
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  async function searchProducts(q) {
+    var d = await zohoFetch('/search-products?q=' + encodeURIComponent(q));
+    return (d && d.payload && d.payload.products) || [];
+  }
+
+  async function addToCart(variantId, qty) {
+    var d = await zohoFetch('/cart', {
+      method: 'POST',
+      body: JSON.stringify({ product_variant_id: String(variantId), quantity: String(qty) })
+    });
+    if (d && d.payload && d.payload.cart_id) {
+      cartId = d.payload.cart_id;
+      localStorage.setItem('ff_cart', cartId);
+    }
+    if (d && d.payload && typeof d.payload.count === 'number') updateBadge(d.payload.count);
+    return d;
+  }
+
+  async function getCart() {
+    if (!cartId) return null;
+    var d = await zohoFetch('/cart?cart_id=' + cartId);
+    if (d && d.payload && typeof d.payload.count === 'number') updateBadge(d.payload.count);
+    return (d && d.payload) || null;
+  }
+
+  async function askClaude(text) {
+    history.push({ role: 'user', content: text });
+    var base = String(CHAT_BACKEND_URL || '').replace(/\/$/, '');
+    if (!base) throw new Error('CHAT_BACKEND_URL is not set');
+    var headers = { 'Content-Type': 'application/json' };
+    if (WIDGET_SECRET) headers['X-Widget-Secret'] = WIDGET_SECRET;
+    var res = await fetch(base + '/api/chat', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        messages: history,
+        context: {
+          storeName: STORE_NAME,
+          storeBase: STORE_BASE,
+          verticals: STORE_VERTICALS,
+          policies: STORE_POLICIES,
+          productsContext: buildCtx()
+        }
+      })
+    });
+    var raw = await res.text();
+    var d = {};
+    try { d = JSON.parse(raw); } catch (e) {}
+    if (!res.ok) throw new Error((d && d.error) || ('Chat API ' + res.status));
+    var reply = (d && d.reply) || "I'm not sure — try browsing the store!";
+    history.push({ role: 'assistant', content: reply });
+    if (history.length > 20) history.splice(0, 2);
+    return reply;
+  }
+
+  function buildCtx() {
+    var prods = Object.values(cache);
+    if (!prods.length) return 'None yet.';
+    return prods.map(function (p) {
+      var price = getPrice(p), orig = getOrig(p);
+      var opts = {};
+      (p.variants || []).forEach(function (v) {
+        (v.options || []).forEach(function (o) {
+          if (!opts[o.name]) opts[o.name] = [];
+          if (opts[o.name].indexOf(o.value) < 0) opts[o.name].push(o.value);
+        });
+      });
+      var os = Object.keys(opts).map(function (k) { return k + ': ' + opts[k].join(', '); }).join(' | ');
+      var d  = (p.short_description || '').replace(/<[^>]*>/g, '').trim();
+      return '- ' + p.name + ' Rs.' + price + (orig > price ? ' (was Rs.' + orig + ')' : '') + (os ? ' | ' + os : '') + (d ? ' | ' + d : '');
+    }).join('\n');
+  }
+
+  function intent(text) {
+    var l = text.toLowerCase().trim();
+    if (/^(hi|hello|hey|namaste|sup|yo)\b/.test(l)) return 'greeting';
+    if (/\b(cart|bag|my order|checkout)\b/.test(l)) return 'cart';
+
+    var wantsCats =
+      /\b(categor(y|ies)|department(s)?)\b/.test(l) &&
+      /\b(list|show|browse|view|see|display|what|all|every|print|give)\b/.test(l);
+    var wantsCols =
+      /\b(collection(s)?|lookbook|curated)\b/.test(l) &&
+      /\b(list|show|browse|view|see|display|what|all|every|print|give)\b/.test(l);
+    if (wantsCols && !wantsCats) return 'collections';
+    if (wantsCats && !wantsCols) return 'categories';
+    if (wantsCats && wantsCols) return 'categories'; // default to categories; user can ask again for collections
+
+    if (
+      /\b(list|show|browse|view)\s+all\s+(products|items)\b/.test(l) ||
+      /\b(all|full|entire)\s+(product\s+)?(catalog(ue)?|inventory|range)\b/.test(l) ||
+      /\bbrowse\s+all\s+products\b/.test(l)
+    ) return 'all_products';
+
+    if (/[?]|^(what|how|does|do|is|are|can|tell|which|why|where|when|explain|describe|material|fabric|care|wash|return|ship|deliver|discount|coupon|price|cost|fit|style|recommend|warranty|assembly|voltage|size|dimension)/i.test(text)) return 'question';
+    return text.trim().split(/\s+/).length > 4 ? 'question' : 'search';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function getImg(p)   { var u=(p.images||[])[0] && (p.images||[])[0].url; return u ? STORE_BASE+u+'/600x600' : ''; }
+  function getPrice(p) { var v=(p.variants||[])[0]||{}; return v.selling_price||p.selling_price||0; }
+  function getOrig(p)  { var v=(p.variants||[])[0]||{}; return v.label_price||p.label_price||0; }
+  function getVid(p)   { var v=(p.variants||[])[0]||{}; return v.variant_id||v.id||''; }
+  function isOOS(p)    { return p.is_out_of_stock||((p.variants||[])[0]||{}).is_out_of_stock; }
+
+  function updateBadge(n) {
+    ['ff-cbadge','ff-fab-badge'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.textContent = n; el.classList.toggle('on', n > 0); }
+    });
+  }
+
+  function walkCategories(nodes, depth, out) {
+    (nodes || []).forEach(function (n) {
+      if (n.visibility === false) return;
+      out.push({ name: n.name, url: n.url || '', depth: depth });
+      walkCategories(n.sub_categories, depth + 1, out);
+    });
+  }
+
+  function categoryListHtml(rows) {
+    return rows.map(function (r) {
+      var pad = new Array(r.depth * 3 + 1).join('&nbsp;');
+      var href = r.url ? STORE_BASE + r.url : STORE_BASE;
+      return pad + '&#8226; <a href="' + esc(href) + '" target="_blank" rel="noopener" style="color:var(--ff-a);font-weight:600">' + esc(r.name) + '</a>';
+    }).join('<br>');
+  }
+
+  async function showCategoriesInChat() {
+    addTyping();
+    try {
+      var d = await zohoFetch('/categories');
+      rmTyping();
+      var cats = (d && d.payload && d.payload.categories) || [];
+      var flat = [];
+      walkCategories(cats, 0, flat);
+      if (!flat.length) {
+        addRow('bot', 'No categories are available from the store right now.');
+        chips(['List all collections', 'Browse all products', 'View cart']);
+        return;
+      }
+      addRow('bot', '<strong>Categories</strong> (tap a link to open on the store):<br><br>' + categoryListHtml(flat));
+      chips(['List all collections', 'Browse all products', 'View cart', 'Search in chat']);
+    } catch (e) {
+      rmTyping();
+      addRow('bot', 'Could not load categories. Please try again.');
+    }
+  }
+
+  async function showCollectionsInChat() {
+    addTyping();
+    try {
+      var d = await zohoFetch('/collections');
+      rmTyping();
+      var cols = (d && d.payload && d.payload.collections) || [];
+      if (!cols.length) {
+        addRow('bot', 'No collections are published on the store right now.');
+        chips(['List all categories', 'Browse all products', 'View cart']);
+        return;
+      }
+      var lines = cols.map(function (c) {
+        var id = String(c.id || '').replace(/'/g, '');
+        var label = esc(c.name || 'Collection');
+        return '&#8226; <button type="button" class="ff-chip" style="margin:2px 0" onclick="ffLoadCollection(\'' + esc(id) + '\')">' + label + '</button>';
+      }).join('<br>');
+      addRow('bot', '<strong>Collections</strong> — tap a collection to load its products here:<br><br>' + lines);
+      chips(['List all categories', 'Browse all products', 'View cart']);
+    } catch (e) {
+      rmTyping();
+      addRow('bot', 'Could not load collections. Please try again.');
+    }
+  }
+
+  window.ffLoadCollection = async function (collectionId) {
+    if (!collectionId) return;
+    addTyping();
+    try {
+      var d = await zohoFetch('/collections/' + encodeURIComponent(collectionId));
+      rmTyping();
+      var col = (d && d.payload && d.payload.collection) || {};
+      var prods = col.products || [];
+      if (!prods.length) {
+        addRow('bot', 'This collection has no products to show, or they are not loaded in this view. Open the store page for full results.');
+        chips(['List all categories', 'Browse all products', 'View cart']);
+        return;
+      }
+      prods.forEach(function (p) { cache[p.product_id] = p; });
+      addRow('bot', 'Collection <strong>' + esc(col.name || 'Selected') + '</strong> — tap a tile for details:');
+      addTiles(prods.slice(0, LIST_PRODUCTS_CAP));
+      chips(['Ask about these products', 'List all collections', 'View cart']);
+    } catch (e) {
+      rmTyping();
+      addRow('bot', 'Could not load that collection. Try again from the list.');
+    }
+  };
+
+  async function showAllProductsInChat() {
+    addTyping();
+    try {
+      var prods = await searchProducts('');
+      rmTyping();
+      if (!prods.length) {
+        addRow('bot', 'No products returned for a broad browse. Try searching for something specific.');
+        chips(['List all categories', 'List all collections', 'View cart']);
+        return;
+      }
+      var slice = prods.slice(0, LIST_PRODUCTS_CAP);
+      slice.forEach(function (p) { cache[p.product_id] = p; });
+      addRow('bot', 'Showing up to <strong>' + slice.length + '</strong> products from the catalog (first page). Tap a tile for details:');
+      addTiles(slice);
+      chips(['Ask about these products', 'List all categories', 'List all collections', 'View cart']);
+    } catch (e) {
+      rmTyping();
+      addRow('bot', 'Could not load products. Please try again.');
+    }
+  }
+
+  var msgs = document.getElementById('ff-msgs');
+
+  function addRow(role, html) {
+    var w = document.createElement('div'); w.className = 'ff-row ' + role;
+    w.innerHTML = role === 'bot'
+      ? '<div class="ff-av">&#10022;</div><div class="ff-bbl">' + html + '</div>'
+      : '<div class="ff-bbl">' + esc(html) + '</div>';
+    msgs.appendChild(w); msgs.scrollTop = msgs.scrollHeight;
+  }
+  function addTyping() {
+    var w = document.createElement('div'); w.className = 'ff-row bot'; w.id = 'ff-typ';
+    w.innerHTML = '<div class="ff-av">&#10022;</div><div class="ff-bbl"><div class="ff-typing"><span></span><span></span><span></span></div></div>';
+    msgs.appendChild(w); msgs.scrollTop = msgs.scrollHeight;
+  }
+  function rmTyping() { var t = document.getElementById('ff-typ'); if (t) t.remove(); }
+  function chips(opts) {
+    addRow('bot', '<div class="ff-chips">' + opts.map(function (o) {
+      return '<button class="ff-chip" onclick="ffChip(\'' + esc(o) + '\')">' + esc(o) + '</button>';
+    }).join('') + '</div>');
+  }
+  function toast(msg, ok) {
+    if (ok === undefined) ok = true;
+    var t = document.getElementById('ff-toast');
+    t.style.background = ok ? '#162816' : '#2e1616';
+    t.style.borderColor = ok ? '#2d5a2d' : '#5a2d2d';
+    t.style.color = ok ? '#6dbf6d' : '#e07070';
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 2800);
+  }
+
+  function addTiles(prods) {
+    prods.forEach(function (p) { cache[p.product_id] = p; });
+    var w = document.createElement('div'); w.className = 'ff-row bot'; w.style.maxWidth = '100%';
+    w.innerHTML = '<div class="ff-av">&#10022;</div><div class="ff-bbl" style="padding:7px 9px;width:100%"><div class="ff-tscroll">' + prods.map(tileHtml).join('') + '</div></div>';
+    msgs.appendChild(w); msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function tileHtml(p) {
+    var pid = p.product_id, img = getImg(p);
+    var price = getPrice(p), orig = getOrig(p), oos = isOOS(p), vid = getVid(p);
+    var disc = (orig > price && orig > 0) ? Math.round((1 - price / orig) * 100) : 0;
+    Q[pid] = Q[pid] || 1; V[pid] = V[pid] || vid;
+    return '<div class="ff-tile" id="fft-' + pid + '" onclick="ffExpand(\'' + pid + '\')">'
+      + (img ? '<img class="ff-timg" src="' + img + '" alt="' + esc(p.name) + '" loading="lazy" onerror="this.outerHTML=\'<div class=\\\'ff-tph\\\'>&#128249;</div>\'">'
+             : '<div class="ff-tph">&#128249;</div>')
+      + '<div class="ff-tbody">'
+      +   '<div class="ff-tname">' + esc(p.name) + '</div>'
+      +   '<div class="ff-tpr">'
+      +     '<span class="ff-tprice">&#8377;' + price.toLocaleString('en-IN') + '</span>'
+      +     (orig > price ? '<span class="ff-torig">&#8377;' + orig.toLocaleString('en-IN') + '</span>' : '')
+      +     (disc >= 5    ? '<span class="ff-tbdg">' + disc + '% OFF</span>' : '')
+      +   '</div>'
+      +   (oos ? '<div class="ff-toos">Out of stock</div>' : '')
+      +   '<div class="ff-tatc"><button id="fft-atc-' + pid + '" ' + (oos ? 'disabled' : '')
+      +     ' onclick="event.stopPropagation();ffTileATC(\'' + pid + '\',\'' + vid + '\')">'
+      +     (oos ? 'SOLD OUT' : 'ADD TO CART') + '</button></div>'
+      + '</div></div>';
+  }
+
+  window.ffTileATC = async function (pid, vid) {
+    if (!vid) { toast('No variant available', false); return; }
+    var btn = document.getElementById('fft-atc-' + pid);
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+    try {
+      var r = await addToCart(vid, Q[pid] || 1);
+      if (r && (r.status_code === '0' || r.status_code === 0)) {
+        toast('Added to cart!');
+        if (btn) { btn.textContent = 'ADDED'; setTimeout(function () { btn.disabled = false; btn.textContent = 'ADD TO CART'; }, 2200); }
+      } else { toast('Could not add', false); if (btn) { btn.disabled = false; btn.textContent = 'ADD TO CART'; } }
+    } catch (e) { toast('Network error', false); if (btn) { btn.disabled = false; btn.textContent = 'ADD TO CART'; } }
+  };
+
+  window.ffExpand = function (pid) {
+    var p = cache[pid]; if (!p) return;
+    var vs = p.variants || [], dv = vs[0] || {};
+    V[pid] = dv.variant_id || dv.id || ''; Q[pid] = 1;
+    var img = getImg(p), price = getPrice(p), orig = getOrig(p);
+    var desc = (p.short_description || '').replace(/<[^>]*>/g, '').trim();
+    var url  = STORE_BASE + '/products/' + (p.seo_url || pid);
+    var om = {};
+    vs.forEach(function (v) {
+      (v.options || []).forEach(function (o) {
+        if (!om[o.name]) om[o.name] = [];
+        if (om[o.name].indexOf(o.value) < 0) om[o.name].push(o.value);
+      });
+    });
+    var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(vs))));
+    var oHtml = Object.keys(om).map(function (name) {
+      return '<div class="ff-vgrp"><div class="ff-vlbl">' + esc(name) + '</div><div class="ff-vrow">'
+        + om[name].map(function (v, i) {
+            return '<button class="ff-vchip' + (i === 0 ? ' sel' : '') + '" data-opt="' + esc(name) + '" data-val="' + esc(v) + '"'
+              + ' onclick="ffPickV(this,\'' + pid + '\',\'' + b64 + '\')">' + esc(v) + '</button>';
+          }).join('') + '</div></div>';
+    }).join('');
+    addRow('bot',
+      '<div class="ff-pcard">'
+      + (img ? '<img class="ff-pcimg" src="' + img + '" alt="' + esc(p.name) + '" onerror="this.outerHTML=\'<div class=\\\'ff-pcph\\\'>&#128249;</div>\'">'
+             : '<div class="ff-pcph">&#128249;</div>')
+      + '<div class="ff-pcbody">'
+      + '<div class="ff-pcname">' + esc(p.name) + '</div>'
+      + '<div class="ff-pcprice">&#8377;' + price.toLocaleString('en-IN')
+      + (orig > price ? ' <span style="text-decoration:line-through;color:var(--ff-di);font-size:11px;margin-left:4px">&#8377;' + orig.toLocaleString('en-IN') + '</span>' : '')
+      + '</div>'
+      + (desc ? '<div class="ff-pcdesc">' + esc(desc) + '</div>' : '')
+      + oHtml
+      + '<div class="ff-atcrow">'
+      + '<button class="ff-qb" onclick="ffChQ(\'' + pid + '\',-1)">&#8722;</button>'
+      + '<span class="ff-qn" id="ff-qn-' + pid + '">1</span>'
+      + '<button class="ff-qb" onclick="ffChQ(\'' + pid + '\',1)">+</button>'
+      + '<button class="ff-atcbtn" id="ff-catc-' + pid + '" onclick="ffCardATC(\'' + pid + '\')">ADD TO CART</button>'
+      + '<a class="ff-vbtn" href="' + url + '" target="_blank" rel="noopener">&#8599;</a>'
+      + '</div></div></div>'
+    );
+  };
+
+  window.ffPickV = function (btn, pid, b64) {
+    btn.closest('.ff-vrow').querySelectorAll('.ff-vchip').forEach(function (c) { c.classList.remove('sel'); });
+    btn.classList.add('sel');
+    var sels = {};
+    btn.closest('.ff-pcbody').querySelectorAll('.ff-vchip.sel').forEach(function (c) { sels[c.dataset.opt] = c.dataset.val; });
+    try {
+      var vs = JSON.parse(decodeURIComponent(escape(atob(b64))));
+      var m  = vs.find(function (v) { return (v.options || []).every(function (o) { return sels[o.name] === o.value; }); });
+      if (m) V[pid] = m.variant_id || m.id;
+    } catch (e) {}
+  };
+
+  window.ffChQ = function (pid, d) {
+    Q[pid] = Math.max(1, (Q[pid] || 1) + d);
+    var el = document.getElementById('ff-qn-' + pid);
+    if (el) el.textContent = Q[pid];
+  };
+
+  window.ffCardATC = async function (pid) {
+    var vid = V[pid];
+    if (!vid) { toast('Select a size/color first', false); return; }
+    var btn = document.getElementById('ff-catc-' + pid);
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try {
+      var r = await addToCart(vid, Q[pid] || 1);
+      if (r && (r.status_code === '0' || r.status_code === 0)) {
+        toast('Added ' + (Q[pid] || 1) + 'x to cart!');
+        if (btn) { btn.textContent = 'ADDED'; setTimeout(function () { btn.disabled = false; btn.textContent = 'ADD TO CART'; }, 2500); }
+      } else { toast('Could not add', false); if (btn) { btn.disabled = false; btn.textContent = 'ADD TO CART'; } }
+    } catch (e) { toast('Network error', false); if (btn) { btn.disabled = false; btn.textContent = 'ADD TO CART'; } }
+  };
+
+  window.ffShowCart = async function () {
+    addTyping();
+    try {
+      var cart = await getCart(); rmTyping();
+      if (!cart || !cart.items || !cart.items.length) {
+        addRow('bot', 'Your cart is empty. What would you like to shop for?');
+        return;
+      }
+      var lines = cart.items.map(function (i) {
+        return '- <strong>' + esc(i.name || 'Item') + '</strong> x' + i.quantity
+          + ' - Rs.' + ((i.approximate_total || 0).toLocaleString('en-IN'));
+      }).join('<br>');
+      var href = cartId ? STORE_BASE + '/checkout?checkout_id=' + cartId : STORE_BASE + '/checkout';
+      addRow('bot',
+        'Your Cart (' + cart.count + ' item' + (cart.count !== 1 ? 's' : '') + ')<br><br>'
+        + lines + '<br><br>'
+        + '<strong>Subtotal: Rs.' + (cart.sub_total || 0).toLocaleString('en-IN') + '</strong><br><br>'
+        + '<a href="' + href + '" target="_blank" rel="noopener" style="color:var(--ff-a);font-weight:600">Proceed to Checkout</a>'
+      );
+    } catch (e) { rmTyping(); addRow('bot', 'Could not load cart. Please try again.'); }
+  };
+
+  async function handleMsg(text) {
+    var it = intent(text);
+    if (it === 'greeting') {
+      addRow('bot', 'Hey! Welcome to <strong>' + STORE_NAME + '</strong>. Search, browse categories and collections, or ask a question.');
+      chips(['List all categories', 'List all collections', 'Browse all products', 'Office chair', 'LED TV', 'Sofa', 'Kurti']);
+      return;
+    }
+    if (it === 'cart') { await ffShowCart(); return; }
+    if (it === 'categories') { await showCategoriesInChat(); return; }
+    if (it === 'collections') { await showCollectionsInChat(); return; }
+    if (it === 'all_products') { await showAllProductsInChat(); return; }
+    if (it === 'question') {
+      addTyping();
+      try { var r1 = await askClaude(text); rmTyping(); addRow('bot', esc(r1)); chips(['Show me the product', 'List all categories', 'View cart', 'Ask another question']); }
+      catch (e) { rmTyping(); addRow('bot', 'Could not get an answer. Try rephrasing!'); }
+      return;
+    }
+    addTyping();
+    var prods = [];
+    try { prods = await searchProducts(text); }
+    catch (e) { rmTyping(); addRow('bot', 'Could not reach the store API. Please try again.'); return; }
+    rmTyping();
+    if (!prods.length) {
+      addTyping();
+      try { var r2 = await askClaude(text); rmTyping(); addRow('bot', esc(r2)); }
+      catch (e) { rmTyping(); addRow('bot', 'No results for "' + esc(text) + '". Try another keyword or browse categories.'); chips(['List all categories', 'Browse all products', 'Office chair']); }
+      return;
+    }
+    prods.forEach(function (p) { cache[p.product_id] = p; });
+    addRow('bot', 'Found <strong>' + prods.length + '</strong> result' + (prods.length > 1 ? 's' : '') + ' for "' + esc(text) + '" - tap a tile for details:');
+    addTiles(prods);
+    chips(['Ask about these products', 'List all collections', 'View cart', 'Search something else']);
+  }
+
+  window.ffSend = function () {
+    var inp = document.getElementById('ff-inp'), text = inp.value.trim();
+    if (!text) return;
+    addRow('user', text); inp.value = ''; inp.style.height = '';
+    handleMsg(text);
+  };
+  window.ffOnKey   = function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ffSend(); } };
+  window.ffResize  = function (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 80) + 'px'; };
+
+  var CHIP_ALIASES = {
+    'Search in chat': '__focus__',
+    'Search something else': '__focus__',
+    'Ask another question': '__focus__',
+    'View cart': '__cart__',
+    'List all categories': '__categories__',
+    'List all collections': '__collections__',
+    'Browse all products': '__all_products__'
+  };
+
+  window.ffChip = function (t) {
+    if (CHIP_ALIASES[t] === '__focus__') { document.getElementById('ff-inp').focus(); return; }
+    if (CHIP_ALIASES[t] === '__cart__') { ffShowCart(); return; }
+    if (CHIP_ALIASES[t] === '__categories__') { addRow('user', t); handleMsg('list all categories'); return; }
+    if (CHIP_ALIASES[t] === '__collections__') { addRow('user', t); handleMsg('list all collections'); return; }
+    if (CHIP_ALIASES[t] === '__all_products__') { addRow('user', t); handleMsg('browse all products'); return; }
+    if (t === 'Ask about these products') { addRow('bot', 'Ask me anything — materials, electronics specs, furniture size, care, or styling.'); document.getElementById('ff-inp').focus(); return; }
+    if (t === 'Show me the product') {
+      var vals = Object.values(cache), last = vals[vals.length - 1];
+      if (last) { addRow('bot', 'Here\'s <strong>' + esc(last.name) + '</strong>:'); ffExpand(last.product_id); }
+      else addRow('bot', 'Search or browse products first, then try again.');
+      return;
+    }
+    addRow('user', t); handleMsg(t);
+  };
+
+  addRow('bot', 'Welcome to <strong>' + STORE_NAME + '</strong>! Search for items, or say <strong>list all categories</strong>, <strong>list all collections</strong>, or <strong>browse all products</strong>.');
+  chips(['List all categories', 'List all collections', 'Browse all products', 'Office chair', 'Wall clock', 'Dining table']);
+
+})();
+</script>
